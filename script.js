@@ -1,7 +1,8 @@
 const BOT_USERNAME = "Al3agle_bot";
-const ADMIN_TELEGRAM_ID = "1056007305"; // معرف الأدمن الوحيد المطلوب حصرياً
+const ADMIN_TELEGRAM_ID = "1056007305"; // معرف الأدمن الحصري
 
-let state = {
+// الحالة الافتراضية (بدون تجارب وهمية مسبقة)
+const defaultState = {
     onlineUsers: 14,
     activeCategory: "الكل",
     categories: ["الكل", "الحرس الملكي", "الحرس الوطني", "وزارة الدفاع", "الكلية الامنيه", "أخرى"],
@@ -9,22 +10,16 @@ let state = {
         { id: 1, title: "متجر العاقل - خدمات وحلول متكاملة", link: "https://t.me/Al3agl_bot" },
         { id: 2, title: "انضم إلى قروب المناقشة الرسمي", link: "https://t.me/Q3skrr" }
     ],
-    experiences: [
-        {
-            id: 101,
-            gender: "ذكر",
-            edu: "جامعي",
-            status: "طالب بالكلية",
-            year: "1447",
-            category: "وزارة الدفاع",
-            content: "أهرامات الجيزة تقع على هضبة الجيزة في محافظة الجيزة على الضفة الغربية لنهر النيل.",
-            upvotes: 12,
-            downvotes: 2,
-            hidden: false
-        }
-    ],
+    experiences: [],
     currentUser: null
 };
+
+// استرجاع البيانات المحفوظة محلياً إن وجدت، وإلا استخدام الافتراضية
+let state = JSON.parse(localStorage.getItem('al3agl_state')) || defaultState;
+
+function saveState() {
+    localStorage.setItem('al3agl_state', JSON.stringify(state));
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     initStarsBg();
@@ -36,6 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initStarsBg() {
     const container = document.getElementById('starsBg');
+    if (!container) return;
+    container.innerHTML = '';
     for (let i = 0; i < 35; i++) {
         const star = document.createElement('div');
         star.className = 'star';
@@ -61,6 +58,8 @@ function switchTab(viewId, btnEl) {
 function renderCategories() {
     const bar = document.getElementById('categoriesBar');
     const select = document.getElementById('fieldCategory');
+    if (!bar || !select) return;
+    
     bar.innerHTML = '';
     select.innerHTML = '';
 
@@ -89,6 +88,8 @@ function renderCategories() {
 function renderAds() {
     const track = document.getElementById('carouselTrack');
     const dots = document.getElementById('carouselDots');
+    if (!track || !dots) return;
+    
     track.innerHTML = '';
     dots.innerHTML = '';
 
@@ -110,6 +111,7 @@ function renderAds() {
 
 function renderExperiences() {
     const feed = document.getElementById('experiencesFeed');
+    if (!feed) return;
     feed.innerHTML = '';
 
     let filtered = state.experiences.filter(item => !item.hidden);
@@ -123,6 +125,11 @@ function renderExperiences() {
     });
 
     filtered.sort((a, b) => b.accuracy - a.accuracy);
+
+    if (filtered.length === 0) {
+        feed.innerHTML = `<p style="text-align:center; color:var(--text-gray); font-size:0.85rem; padding:20px;">لا توجد تجارب مضافة حتى الآن في هذا القسم.</p>`;
+        return;
+    }
 
     filtered.forEach(exp => {
         const card = document.createElement('div');
@@ -171,6 +178,7 @@ function vote(expId, type) {
         else item.downvotes++;
         item.userVoted = type;
     }
+    saveState();
     renderExperiences();
 }
 
@@ -205,6 +213,7 @@ function createNewExperience() {
     };
 
     state.experiences.unshift(newExp);
+    saveState();
     document.getElementById('fieldContent').value = '';
     alert('تم إرسال تجربتك بنجاح!');
     switchTab('viewHome', document.querySelectorAll('.nav-item')[0]);
@@ -213,7 +222,7 @@ function createNewExperience() {
 
 function initTelegramAuth() {
     const container = document.getElementById('telegramWidgetContainer');
-    if (!container) return;
+    if (!container || container.innerHTML.trim() !== '') return;
     const script = document.createElement('script');
     script.src = "https://telegram.org/js/telegram-widget.js?22";
     script.setAttribute("data-telegram-login", BOT_USERNAME);
@@ -225,19 +234,19 @@ function initTelegramAuth() {
     container.appendChild(script);
 }
 
-// دالة تسجيل الدخول والتحقق الصارم من اليوزر آيدي للأدمن
 function onTelegramAuth(user) {
     state.currentUser = user;
+    saveState();
     document.getElementById('telegramWidgetContainer').style.display = 'none';
     const profile = document.getElementById('userProfileDisplay');
-    profile.style.display = 'block';
-    profile.innerHTML = `مرحباً، ${user.first_name} ${user.username ? '(@' + user.username + ')' : ''}`;
+    if (profile) {
+        profile.style.display = 'block';
+        profile.innerHTML = `مرحباً، ${user.first_name} ${user.username ? '(@' + user.username + ')' : ''}`;
+    }
 
-    // التحقق الحصري لمعرف الأدمن المطلوب
     if (String(user.id) === ADMIN_TELEGRAM_ID) {
-        document.getElementById('adminBtn').style.display = 'inline-block';
-    } else {
-        document.getElementById('adminBtn').style.display = 'none';
+        const adminBtn = document.getElementById('adminBtn');
+        if (adminBtn) adminBtn.style.display = 'inline-block';
     }
 }
 
@@ -265,9 +274,9 @@ function renderAdminExperiences() {
         const row = document.createElement('div');
         row.className = 'admin-exp-row';
         row.innerHTML = `
-            <span style="max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${exp.content}</span>
+            <span style="max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${exp.content}</span>
             <div>
-                <button onclick="toggleHideExp(${exp.id})" style="color:var(--gold-light); margin-left:8px;">${exp.hidden ? 'إظهار' : 'إخفاء'}</button>
+                <button onclick="toggleHideExp(${exp.id})" style="color:var(--gold-light); margin-left:6px;">${exp.hidden ? 'إظهار' : 'إخفاء'}</button>
                 <button onclick="deleteExp(${exp.id})">حذف</button>
             </div>
         `;
@@ -279,6 +288,7 @@ function addAdminCategory() {
     const val = document.getElementById('adminCatInput').value.trim();
     if (val && !state.categories.includes(val)) {
         state.categories.push(val);
+        saveState();
         document.getElementById('adminCatInput').value = '';
         renderCategories();
     }
@@ -286,6 +296,7 @@ function addAdminCategory() {
 
 function removeCategory(cat) {
     state.categories = state.categories.filter(c => c !== cat);
+    saveState();
     renderCategories();
 }
 
@@ -294,6 +305,7 @@ function addAdminAd() {
     const link = document.getElementById('adminAdLink').value.trim();
     if (text) {
         state.ads.push({ id: Date.now(), title: text, link: link });
+        saveState();
         document.getElementById('adminAdText').value = '';
         document.getElementById('adminAdLink').value = '';
         renderAds();
@@ -305,6 +317,7 @@ function toggleHideExp(id) {
     const exp = state.experiences.find(e => e.id === id);
     if (exp) {
         exp.hidden = !exp.hidden;
+        saveState();
         renderExperiences();
         renderAdminExperiences();
     }
@@ -312,6 +325,7 @@ function toggleHideExp(id) {
 
 function deleteExp(id) {
     state.experiences = state.experiences.filter(e => e.id !== id);
+    saveState();
     renderExperiences();
     renderAdminExperiences();
 }
@@ -320,6 +334,8 @@ function updateOnlineCount() {
     const val = document.getElementById('adminOnlineInput').value;
     if (val) {
         document.getElementById('onlineCount').innerText = val;
+        state.onlineUsers = val;
+        saveState();
         alert('تم تحديث عدد المتصلين');
         closeAdminModal();
     }
