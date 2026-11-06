@@ -215,6 +215,17 @@ body {
     text-align: center;
 }
 
+.login-warning-box {
+    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    color: #ff6b6b;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
 .categories-wrapper { margin-bottom: 15px; }
 
 .categories-scroll {
