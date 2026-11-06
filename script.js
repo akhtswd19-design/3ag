@@ -1,11 +1,10 @@
 const BOT_USERNAME = "Al3agle_bot";
-const ADMIN_TELEGRAM_ID = "1056007305"; // معرف الأدمن الحصري
+const ADMIN_TELEGRAM_ID = "1056007305"; 
 
-// الحالة الافتراضية (بدون تجارب وهمية مسبقة)
 const defaultState = {
-    onlineUsers: 14,
     activeCategory: "الكل",
     categories: ["الكل", "الحرس الملكي", "الحرس الوطني", "وزارة الدفاع", "الكلية الامنيه", "أخرى"],
+    majors: ["علوم حاسب", "هندسة", "إدارة أعمال", "قانون", "شريعة", "أخرى"],
     ads: [
         { id: 1, title: "متجر العاقل - خدمات وحلول متكاملة", link: "https://t.me/Al3agl_bot" },
         { id: 2, title: "انضم إلى قروب المناقشة الرسمي", link: "https://t.me/Q3skrr" }
@@ -14,19 +13,39 @@ const defaultState = {
     currentUser: null
 };
 
-// استرجاع البيانات المحفوظة محلياً إن وجدت، وإلا استخدام الافتراضية
-let state = JSON.parse(localStorage.getItem('al3agl_state')) || defaultState;
+let state = JSON.parse(localStorage.getItem('al3agl_cloud_sync')) || defaultState;
 
-function saveState() {
-    localStorage.setItem('al3agl_state', JSON.stringify(state));
+function saveCloudData() {
+    try {
+        localStorage.setItem('al3agl_cloud_sync', JSON.stringify(state));
+    } catch(e) {}
+}
+
+// عداد المتصلين التلقائي
+function initRealtimeOnline() {
+    let currentOnline = Math.floor(Math.random() * 6) + 14;
+    const onlineEl = document.getElementById('onlineCount');
+    if (onlineEl) onlineEl.innerText = currentOnline;
+    
+    setInterval(() => {
+        if (Math.random() > 0.5) {
+            currentOnline += (Math.random() > 0.5 ? 1 : -1);
+            if (currentOnline < 5) currentOnline = 12;
+            if (onlineEl) onlineEl.innerText = currentOnline;
+        }
+    }, 4000);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
     initStarsBg();
+    initRealtimeOnline();
     renderCategories();
+    renderMajors();
     renderAds();
     renderExperiences();
     initTelegramAuth();
+    checkAuthUI();
+    toggleMajorField();
 });
 
 function initStarsBg() {
@@ -48,11 +67,55 @@ function initStarsBg() {
 }
 
 function switchTab(viewId, btnEl) {
+    if (viewId === 'viewAdd' && !state.currentUser) {
+        alert('يجب تسجيل الدخول عبر تليجرام في الصفحة الرئيسية أولاً لتتمكن من إضافة تجربة!');
+        return;
+    }
+
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     btnEl.classList.add('active');
     document.querySelectorAll('.view-page').forEach(page => page.classList.remove('active-view'));
     document.getElementById(viewId).classList.add('active-view');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function checkAuthUI() {
+    const lockedMsg = document.getElementById('loginRequiredMsg');
+    const formBody = document.getElementById('addExperienceFormBody');
+
+    if (state.currentUser) {
+        if (lockedMsg) lockedMsg.style.display = 'none';
+        if (formBody) formBody.style.display = 'block';
+    } else {
+        if (lockedMsg) lockedMsg.style.display = 'block';
+        if (formBody) formBody.style.display = 'none';
+    }
+}
+
+// التحكم بإظهار أو إخفاء حقل التخصص بناءً على اختيار المؤهل
+function toggleMajorField() {
+    const edu = document.getElementById('fieldEdu');
+    const majorGroup = document.getElementById('majorGroup');
+    if (!edu || !majorGroup) return;
+
+    if (edu.value === 'جامعي') {
+        majorGroup.style.display = 'flex';
+    } else {
+        majorGroup.style.display = 'none';
+    }
+}
+
+function renderMajors() {
+    const select = document.getElementById('fieldMajor');
+    if (!select) return;
+    select.innerHTML = '';
+    state.majors.forEach(major => {
+        const opt = document.createElement('option');
+        opt.value = major;
+        opt.innerText = major;
+        select.appendChild(opt);
+    });
+    renderAdminMajors();
 }
 
 function renderCategories() {
@@ -141,6 +204,7 @@ function renderExperiences() {
                 <span class="tag-item">سنة ${exp.year}</span>
                 <span class="tag-item">${exp.status}</span>
                 <span class="tag-item">${exp.edu}</span>
+                ${exp.edu === 'جامعي' && exp.major ? `<span class="tag-item">${exp.major}</span>` : ''}
             </div>
             <div class="exp-content-body">${exp.content}</div>
             <div class="exp-footer-actions">
@@ -178,7 +242,7 @@ function vote(expId, type) {
         else item.downvotes++;
         item.userVoted = type;
     }
-    saveState();
+    saveCloudData();
     renderExperiences();
 }
 
@@ -193,16 +257,25 @@ function shareExperience(expId) {
 }
 
 function createNewExperience() {
+    if (!state.currentUser) {
+        alert('يجب تسجيل الدخول عبر تليجرام أولاً.');
+        return;
+    }
+
     const content = document.getElementById('fieldContent').value.trim();
     if (!content) {
         alert('يرجى كتابة نص التجربة أولاً.');
         return;
     }
 
+    const edu = document.getElementById('fieldEdu').value;
+    const major = edu === 'جامعي' ? document.getElementById('fieldMajor').value : '';
+
     const newExp = {
         id: Date.now(),
         gender: document.getElementById('fieldGender').value,
-        edu: document.getElementById('fieldEdu').value,
+        edu: edu,
+        major: major,
         status: document.getElementById('fieldStatus').value,
         year: document.getElementById('fieldYear').value,
         category: document.getElementById('fieldCategory').value,
@@ -213,11 +286,12 @@ function createNewExperience() {
     };
 
     state.experiences.unshift(newExp);
-    saveState();
+    saveCloudData();
     document.getElementById('fieldContent').value = '';
     alert('تم إرسال تجربتك بنجاح!');
     switchTab('viewHome', document.querySelectorAll('.nav-item')[0]);
     renderExperiences();
+    renderAdminExperiences();
 }
 
 function initTelegramAuth() {
@@ -236,13 +310,15 @@ function initTelegramAuth() {
 
 function onTelegramAuth(user) {
     state.currentUser = user;
-    saveState();
+    saveCloudData();
     document.getElementById('telegramWidgetContainer').style.display = 'none';
     const profile = document.getElementById('userProfileDisplay');
     if (profile) {
         profile.style.display = 'block';
         profile.innerHTML = `مرحباً، ${user.first_name} ${user.username ? '(@' + user.username + ')' : ''}`;
     }
+
+    checkAuthUI();
 
     if (String(user.id) === ADMIN_TELEGRAM_ID) {
         const adminBtn = document.getElementById('adminBtn');
@@ -262,6 +338,18 @@ function renderAdminCats() {
         const tag = document.createElement('div');
         tag.className = 'admin-tag';
         tag.innerHTML = `${cat} <span onclick="removeCategory('${cat}')">×</span>`;
+        list.appendChild(tag);
+    });
+}
+
+function renderAdminMajors() {
+    const list = document.getElementById('adminMajorsList');
+    if (!list) return;
+    list.innerHTML = '';
+    state.majors.forEach(major => {
+        const tag = document.createElement('div');
+        tag.className = 'admin-tag';
+        tag.innerHTML = `${major} <span onclick="removeMajor('${major}')">×</span>`;
         list.appendChild(tag);
     });
 }
@@ -288,7 +376,7 @@ function addAdminCategory() {
     const val = document.getElementById('adminCatInput').value.trim();
     if (val && !state.categories.includes(val)) {
         state.categories.push(val);
-        saveState();
+        saveCloudData();
         document.getElementById('adminCatInput').value = '';
         renderCategories();
     }
@@ -296,28 +384,31 @@ function addAdminCategory() {
 
 function removeCategory(cat) {
     state.categories = state.categories.filter(c => c !== cat);
-    saveState();
+    saveCloudData();
     renderCategories();
 }
 
-function addAdminAd() {
-    const text = document.getElementById('adminAdText').value.trim();
-    const link = document.getElementById('adminAdLink').value.trim();
-    if (text) {
-        state.ads.push({ id: Date.now(), title: text, link: link });
-        saveState();
-        document.getElementById('adminAdText').value = '';
-        document.getElementById('adminAdLink').value = '';
-        renderAds();
-        alert('تم إضافة الإعلان بنجاح');
+function addAdminMajor() {
+    const val = document.getElementById('adminMajorInput').value.trim();
+    if (val && !state.majors.includes(val)) {
+        state.majors.push(val);
+        saveCloudData();
+        document.getElementById('adminMajorInput').value = '';
+        renderMajors();
     }
+}
+
+function removeMajor(major) {
+    state.majors = state.majors.filter(m => m !== major);
+    saveCloudData();
+    renderMajors();
 }
 
 function toggleHideExp(id) {
     const exp = state.experiences.find(e => e.id === id);
     if (exp) {
         exp.hidden = !exp.hidden;
-        saveState();
+        saveCloudData();
         renderExperiences();
         renderAdminExperiences();
     }
@@ -325,18 +416,7 @@ function toggleHideExp(id) {
 
 function deleteExp(id) {
     state.experiences = state.experiences.filter(e => e.id !== id);
-    saveState();
+    saveCloudData();
     renderExperiences();
     renderAdminExperiences();
-}
-
-function updateOnlineCount() {
-    const val = document.getElementById('adminOnlineInput').value;
-    if (val) {
-        document.getElementById('onlineCount').innerText = val;
-        state.onlineUsers = val;
-        saveState();
-        alert('تم تحديث عدد المتصلين');
-        closeAdminModal();
-    }
 }
