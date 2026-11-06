@@ -1,4 +1,4 @@
-const BOT_USERNAME = "Al3agl_bot";
+const BOT_USERNAME = "Al3agle_bot";
 const ADMIN_TELEGRAM_ID = "1056007305"; // معرف الأدمن الوحيد المطلوب حصرياً
 
 let state = {
